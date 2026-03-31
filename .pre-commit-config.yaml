@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        stages:
+          - pre-push
+
+default_install_hook_types: 
+  - pre-commit
+  - pre-push
+

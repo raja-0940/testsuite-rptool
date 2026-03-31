@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""
+ReportPortal Tool - Unified Command-Line Interface
+
+Unified command-line interface for all ReportPortal tools.
+
+Usage:
+    rptool write <junit.xml> [OPTIONS]     - Import JUnit results to ReportPortal
+    rptool query [OPTIONS]                 - Query launches and test items
+    rptool trigger [OPTIONS]               - Trigger auto-analysis
+    rptool summary [OPTIONS]               - Generate release summary
+
+Examples:
+    rptool write results.xml --launch-name "My Tests"
+    rptool query --launch-id abc123
+    rptool trigger
+    rptool summary --attribute kuadrant:v1.3.1
+"""
+
+import sys
+import os
+
+# Add src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+from reportportal.rp_dispatcher import main
+
+if __name__ == "__main__":
+    sys.exit(main())

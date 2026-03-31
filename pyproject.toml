@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rptool"
+dynamic = ["version"]
+authors = [
+    {name = "Zdenek Kraus", email = "zkraus@redhat.com"},
+]
+description = "Unified CLI for ReportPortal - import JUnit results, query launches, trigger analysis, and generate summaries"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "junitparser",
+    "reportportal-client",
+    "tabulate",
+    "shtab>=1.6.0",
+    "loguru>=0.7.3",
+    "pyyaml",
+    "platformdirs",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-xdist",
+]
+
+[project.urls]
+Homepage = "https://github.com/Kuadrant/testsuite-rptool"
+Repository = "https://github.com/Kuadrant/testsuite-rptool.git"
+Issues = "https://github.com/Kuadrant/testsuite-rptool/issues"
+Documentation = "https://github.com/Kuadrant/testsuite-rptool/blob/main/README.md"
+
+[project.scripts]
+rptool = "reportportal.rp_dispatcher:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools_scm]
+# Version is automatically derived from git tags
+
