@@ -2,6 +2,9 @@
 MOCK_SUITE="mock_suite"
 RESULTS_PATH?=results
 
+# Detect version from git and normalize to PEP 440 format
+VERSION?=$(shell ./scripts/get-version.sh 2>/dev/null || echo "0.0.0+unknown")
+
 # Mock suite operations
 .PHONY: collect
 collect:
@@ -30,7 +33,7 @@ clean-python:
 
 .PHONY: build
 build: clean-python
-	docker build -t rptool .
+	docker build --build-arg VERSION=$(VERSION) -t rptool .
 
 .PHONY: build-mock-suite
 build-mock-suite:

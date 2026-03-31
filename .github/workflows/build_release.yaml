@@ -53,6 +53,13 @@ jobs:
         with:
           fetch-depth: 0  # fetch tags to generate release notes
 
+      - name: Set version from tag (remove 'v' prefix for PEP 440)
+        id: set-version
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version_tag || github.ref_name }}"
+          VERSION="${TAG#v}"  # Remove 'v' prefix if present
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -64,6 +71,8 @@ jobs:
           tags: ${{ env.IMG_TAGS }}
           layers: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.set-version.outputs.version }}
           containerfiles: |
             ./Dockerfile
 

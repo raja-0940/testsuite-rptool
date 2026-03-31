@@ -43,6 +43,21 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all tags for version detection
+
+      - name: Calculate version
+        id: version
+        run: |
+          # Use script if available, fallback to simple sed
+          if [ -x ./scripts/get-version.sh ]; then
+            VERSION=$(./scripts/get-version.sh)
+          else
+            GIT_VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "${{ github.sha }}")
+            VERSION=$(echo "$GIT_VERSION" | sed -E 's/^v//; s/-dirty$/.dirty/; s/^([0-9.]+)-([0-9]+)-g([0-9a-f]+)/\1.post\2+g\3/; s/^([0-9a-f]{7,})(.*)$/0.0.0+\1\2/')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Detected version: ${VERSION}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -55,6 +70,8 @@ jobs:
           tags: ${{ env.IMG_TAGS }}
           layers: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
           containerfiles: |
             ./Dockerfile
 
