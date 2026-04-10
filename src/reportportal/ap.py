@@ -174,6 +174,11 @@ def _add_query_arguments(subparsers: argparse.ArgumentParser, defaults: dict) ->
         default=None
     )
     parser.add_argument(
+        "--test-target",
+        help="Filter test items by parent test target name (e.g. 'kuadrant' to show only tests under the kuadrant target)",
+        default=None
+    )
+    parser.add_argument(
         "--status",
         choices=["PASSED", "FAILED", "SKIPPED", "INTERRUPTED", "IN_PROGRESS"],
         help="Filter test items by status (only applies when --launch-id is specified)",

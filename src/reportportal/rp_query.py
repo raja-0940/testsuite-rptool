@@ -457,8 +457,34 @@ def _build_filter_description(options: Namespace) -> List[str]:
     if hasattr(options, 'attribute_regex') and options.attribute_regex:
         for attr_regex in options.attribute_regex:
             filters.append(f"attribute_regex=/{attr_regex}/")
+    if hasattr(options, 'test_target') and options.test_target:
+        filters.append(f"test_target={options.test_target}")
 
     return filters
+
+
+def _resolve_test_target(client: 'ReportPortalAPIClient', launch_id: str, target_name: str) -> Optional[str]:
+    """
+    Resolve a test target name to its parent item ID.
+
+    Args:
+        client: ReportPortal API client
+        launch_id: Launch ID to search within
+        target_name: Test target name to find
+
+    Returns:
+        Parent item ID as string if found, None otherwise
+    """
+    # TODO: rewrite to use fetch_test_items once it supports additional filters (see https://github.com/Kuadrant/testsuite-rptool/issues/2)
+    parent_items = client.get_test_items(
+        launch_id,
+        filters={'filter.eq.name': target_name, 'filter.eq.type': 'TEST'}
+    )
+    if not parent_items:
+        return None
+    parent_id = parent_items[0].get('id')
+    logger.info(f"Found test target '{target_name}' with ID: {parent_id}")
+    return parent_id
 
 
 # =============================================================================
@@ -504,6 +530,15 @@ def run_query(options: Namespace) -> int:
         # Query test items for specific launch
         logger.info(f"Querying test items for launch ID: {options.launch_id}{filter_msg}")
 
+        # Resolve test target to parent ID if specified
+        test_target = getattr(options, 'test_target', None)
+        parent_id = None
+        if test_target:
+            parent_id = _resolve_test_target(client, options.launch_id, test_target)
+            if parent_id is None:
+                logger.error(f"No test target found with name: {test_target}")
+                return 1
+
         # Fetch launch info for header (unless names_only mode)
         if not filter_opts['names_only']:
             try:
@@ -516,6 +551,10 @@ def run_query(options: Namespace) -> int:
         if items is None:
             logger.error("Failed to retrieve test items")
             return 1
+        # Filter by parent if test target was specified
+        # TODO: replace local filtering with ReportPortal API filter parameter once fetch_test_items supports it (see https://github.com/Kuadrant/testsuite-rptool/issues/2)
+        if parent_id:
+            items = [item for item in items if item.get('parent') == parent_id]
 
         list_test_items(
             items,
