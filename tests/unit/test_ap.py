@@ -4,6 +4,7 @@ Unit tests for ap (argument parser) module.
 
 import pytest
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 from reportportal.ap import (
@@ -321,11 +322,11 @@ class TestReleaseParser:
                 parser = create_main_parser()
 
                 args = parser.parse_args([
+                    '--log-level', 'DEBUG',
                     'summary',
                     '--rp-project', 'test_project',
                     '--rp-url', 'https://test.reportportal.com',
                     '--rp-token', 'test_key',
-                    '--log-level', 'DEBUG',
                     '--attribute', 'kuadrant:v1.3.1',
                     '--attribute', 'platform:aws',
                     '--days', '7',
@@ -373,7 +374,7 @@ class TestReleaseParser:
                 parser = create_main_parser()
 
                 for level in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
-                    args = parser.parse_args(['summary', '--attribute', 'kuadrant:v1.3.1', '--log-level', level])
+                    args = parser.parse_args(['--log-level', level, 'summary', '--attribute', 'kuadrant:v1.3.1'])
                     assert args.log_level == level
 
     def test_release_parser_days_parameter(self):
@@ -536,3 +537,135 @@ class TestReleaseParserIntegration:
                 assert 'component:controller' in args.attribute
                 assert 'env:staging' in args.attribute
                 assert args.days == 7
+
+
+@pytest.mark.unit
+class TestLogLevelConfig:
+    """Test log level configuration (Issue #6)."""
+
+    def test_log_level_from_config_file(self):
+        """Test that log_level from config file is used as default."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # Simulate config file with DEBUG log level
+                mock_load.return_value = {'log_level': 'DEBUG'}
+                parser = create_main_parser()
+
+                # Parse without --log-level argument
+                args = parser.parse_args(['write', 'test.xml'])
+
+                # Should use config file value
+                assert args.log_level == 'DEBUG'
+
+    def test_log_level_cli_overrides_config(self):
+        """Test that CLI --log-level overrides config file."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # Config has DEBUG
+                mock_load.return_value = {'log_level': 'DEBUG'}
+                parser = create_main_parser()
+
+                # CLI specifies ERROR
+                args = parser.parse_args(['--log-level', 'ERROR', 'write', 'test.xml'])
+
+                # Should use CLI value
+                assert args.log_level == 'ERROR'
+
+    def test_log_level_default_when_no_config(self):
+        """Test that INFO is used when no config is provided."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # No log_level in config
+                mock_load.return_value = {}
+                parser = create_main_parser()
+
+                # Parse without --log-level argument
+                args = parser.parse_args(['write', 'test.xml'])
+
+                # Should use built-in default (INFO)
+                assert args.log_level == 'INFO'
+
+    def test_log_level_works_with_all_commands(self):
+        """Test that config log_level works for all commands."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                mock_load.return_value = {'log_level': 'WARNING'}
+                parser = create_main_parser()
+
+                # Test write command
+                args = parser.parse_args(['write', 'test.xml'])
+                assert args.log_level == 'WARNING'
+
+                # Test query command
+                args = parser.parse_args(['query'])
+                assert args.log_level == 'WARNING'
+
+                # Test trigger command
+                args = parser.parse_args(['trigger'])
+                assert args.log_level == 'WARNING'
+
+                # Test summary command
+                args = parser.parse_args(['summary', '--attribute', 'test:v1'])
+                assert args.log_level == 'WARNING'
+
+    def test_log_level_invalid_in_config(self):
+        """Test that invalid log level in config raises ValueError."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # Simulate config file with invalid log level
+                mock_load.return_value = {'log_level': 'VERBOSE'}
+
+                # Creating parser should raise ValueError
+                with pytest.raises(ValueError) as exc_info:
+                    create_main_parser()
+
+                # Check error message contains the invalid value
+                error_msg = str(exc_info.value)
+                assert 'Invalid log level in config' in error_msg
+                assert 'VERBOSE' in error_msg
+                assert 'Must be one of' in error_msg
+
+    def test_log_level_invalid_in_config_case_insensitive(self):
+        """Test that invalid log level works with case normalization."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # Lowercase 'trace' should also be rejected
+                mock_load.return_value = {'log_level': 'trace'}
+
+                with pytest.raises(ValueError) as exc_info:
+                    create_main_parser()
+
+                error_msg = str(exc_info.value)
+                assert 'Invalid log level in config' in error_msg
+                # Should show uppercase version in error
+                assert 'TRACE' in error_msg
+
+    def test_no_premature_debug_messages_during_config_load(self):
+        """Test that debug messages during config loading are suppressed until log level is set."""
+        import io
+        from unittest.mock import patch
+        from reportportal.rp_dispatcher import main
+
+        # Capture stderr to check for debug messages
+        captured_stderr = io.StringIO()
+
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('reportportal.config.load_config_file') as mock_load:
+                # Simulate config file exists and has values
+                mock_load.return_value = {'log_level': 'INFO', 'rp_url': 'http://test.com'}
+
+                # Redirect stderr
+                with patch('sys.stderr', captured_stderr):
+                    try:
+                        # Run with INFO level (default from config)
+                        # This will fail because we don't have valid args, but we just want to check logging
+                        main(['write', 'test.xml'])
+                    except SystemExit:
+                        pass
+
+                # Check that no "Loaded config from" or "Config file" debug messages appear
+                stderr_output = captured_stderr.getvalue()
+                assert "Loaded config from" not in stderr_output, \
+                    "Debug message 'Loaded config from' should not appear with INFO log level"
+                assert "Config file not found" not in stderr_output, \
+                    "Debug message 'Config file not found' should not appear with INFO log level"

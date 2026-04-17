@@ -37,26 +37,29 @@ def load_config_file() -> Dict[str, Any]:
 
     Returns:
         Dictionary with configuration values, empty dict if file doesn't exist
-        or can't be loaded
+        or is empty.
+
+    Raises:
+        ValueError: When config file cannot be parsed properly.
     """
 
     config_file = get_config_file_path()
 
     if not config_file.exists():
-        logger.debug(f"Config file not found: {config_file}")
+        logger.debug("No config file present, using defaults")
         return {}
 
     try:
         with open(config_file, 'r') as f:
             config = yaml.safe_load(f)
             if config is None:
-                logger.debug(f"Config file is empty: {config_file}")
+                logger.debug("Config file empty")
                 return {}
-            logger.debug(f"Loaded config from: {config_file}")
+            logger.info("Config file loaded successfully")
             return config
     except Exception as e:
-        logger.warning(f"Failed to load config file {config_file}: {e}")
-        return {}
+        # need to raise ValueError to indicate critical problem
+        raise ValueError(f"Error reading config file {config_file} {e}")
 
 
 def get_config_defaults() -> Dict[str, Any]:
@@ -162,6 +165,7 @@ def get_effective_defaults() -> Dict[str, Any]:
     # Inject REQUESTS_CA_BUNDLE into environment if configured but not already set
     if merged.get("requests_ca_bundle") and not os.environ.get("REQUESTS_CA_BUNDLE"):
         os.environ["REQUESTS_CA_BUNDLE"] = merged["requests_ca_bundle"]
-        logger.debug(f"Set REQUESTS_CA_BUNDLE from config: {merged['requests_ca_bundle']}")
+        logger.debug("Set REQUESTS_CA_BUNDLE from config: {}", merged['requests_ca_bundle'])
 
     return merged
+

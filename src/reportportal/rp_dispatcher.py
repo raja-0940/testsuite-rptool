@@ -164,7 +164,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     Returns:
         Exit code (0 for success, 1 for error)
     """
-    parser = ap.create_main_parser()
+    # Remove default loguru handler immediately to prevent premature debug messages
+    # (e.g., during config file loading before log level is determined)
+    logger.remove()
+    # Setup intermittent WARNING logger for any configuration logs
+    # or set to environmnet variable LOG_LEVEL if defined
+    logger.add(sink=sys.stderr, level=os.environ.get('LOG_LEVEL', "").upper() or 'WARNING')
+
+    try:
+        parser = ap.create_main_parser()
+    except ValueError as e:
+        logger.error('Improper configuration {}', str(e))
+        return 1
+
 
     # Parse arguments
     try:
@@ -172,8 +184,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     except SystemExit as e:
         return e.code if e.code is not None else 1
 
-    # setup logging handlers
-    logger.remove() # remove default one
+    # Setup logging handler with configured log level
+    logger.remove()
     logger.add(sink=sys.stderr, level=args.log_level)
 
     # Dispatch to appropriate command handler
